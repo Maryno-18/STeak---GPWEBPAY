@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 export default function handler(req, res) {
   if (req.method !== "POST") {
@@ -12,38 +14,48 @@ export default function handler(req, res) {
   const CURRENCY = "203"; // CZK
   const DEPOSITFLAG = "1";
   const OPERATION = "CREATE_ORDER";
-  const RETURN_URL = "https://www.steak-restaurant.cz/payment-result";
+  const RETURN_URL = process.env.GP_RETURN_URL || "https://your-domain.cz/api/payment-callback";
 
   // Částka v haléřích
   const AMOUNT = amount * 100;
 
-  // Privátní klíč z ENV (šifrovaný → potřebuje passphrase)
+  // Načtení privátního klíče PEM
+  const privateKeyPath = path.join(process.cwd(), "keys", "gpwebpay-pvk.key");
   const privateKey = {
-    key: process.env.GP_PRIVATE_KEY,
+    key: fs.readFileSync(privateKeyPath, "utf8"),
     passphrase: process.env.GP_PRIVATE_KEY_PASSPHRASE,
   };
 
-  // Sestavení dat pro podpis
-  const digestText = [
-    `MERCHANTNUMBER=${MERCHANTNUMBER}`,
-    `OPERATION=${OPERATION}`,
-    `ORDERNUMBER=${orderNumber}`,
-    `AMOUNT=${AMOUNT}`,
-    `CURRENCY=${CURRENCY}`,
-    `DEPOSITFLAG=${DEPOSITFLAG}`,
-    `URL=${RETURN_URL}`,
-    `EMAIL=${email}`
-  ].join("|");
+  // Pole v přesném pořadí pro podpis
+  const params = {
+    MERCHANTNUMBER,
+    OPERATION,
+    ORDERNUMBER: orderNumber,
+    AMOUNT,
+    CURRENCY,
+    DEPOSITFLAG,
+    URL: RETURN_URL,
+    EMAIL: email,
+  };
+
+  // Text pro podpis (oddělený |)
+  const digestText = Object.entries(params)
+    .map(([key, val]) => `${key}=${val}`)
+    .join("|");
 
   try {
-    // Vytvoření podpisu
+    // Vytvoření podpisu SHA1withRSA
     const sign = crypto.createSign("sha1");
-    sign.update(digestText);
+    sign.update(digestText, "utf8");
     const digest = sign.sign(privateKey, "base64");
 
-    // Redirect URL
+    // Query string (URL-encoded hodnoty)
+    const query = Object.entries(params)
+      .map(([key, val]) => `${key}=${encodeURIComponent(val)}`)
+      .join("&");
+
     const gpUrl = "https://test.3dsecure.gpwebpay.com/pgw/order.do";
-    const redirectUrl = `${gpUrl}?${digestText.replace(/\|/g, "&")}&DIGEST=${encodeURIComponent(digest)}`;
+    const redirectUrl = `${gpUrl}?${query}&DIGEST=${encodeURIComponent(digest)}`;
 
     return res.status(200).json({ redirectUrl });
   } catch (error) {
