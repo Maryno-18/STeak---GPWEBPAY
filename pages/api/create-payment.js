@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
 
 export default function handler(req, res) {
@@ -10,7 +8,7 @@ export default function handler(req, res) {
   const { orderNumber, amount, email } = req.body;
 
   // Merchant údaje
-  const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER; // nastavíš ve Vercel Env
+  const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER;
   const CURRENCY = "203"; // CZK
   const DEPOSITFLAG = "1";
   const OPERATION = "CREATE_ORDER";
@@ -19,9 +17,11 @@ export default function handler(req, res) {
   // Částka v haléřích
   const AMOUNT = amount * 100;
 
-  // Soukromý klíč – nahraješ do /keys/gpwebpay-pvk.key
-  const privateKeyPath = path.join(process.cwd(), "keys", "gpwebpay-pvk.key");
-  const privateKey = fs.readFileSync(privateKeyPath, "utf8");
+  // Privátní klíč z ENV (šifrovaný → potřebuje passphrase)
+  const privateKey = {
+    key: process.env.GP_PRIVATE_KEY,
+    passphrase: process.env.GP_PRIVATE_KEY_PASSPHRASE,
+  };
 
   // Sestavení dat pro podpis
   const digestText = [
@@ -35,14 +35,19 @@ export default function handler(req, res) {
     `EMAIL=${email}`
   ].join("|");
 
-  // Vytvoření podpisu
-  const sign = crypto.createSign("sha1");
-  sign.update(digestText);
-  const digest = sign.sign(privateKey, "base64");
+  try {
+    // Vytvoření podpisu
+    const sign = crypto.createSign("sha1");
+    sign.update(digestText);
+    const digest = sign.sign(privateKey, "base64");
 
-  // Redirect URL
-  const gpUrl = "https://test.3dsecure.gpwebpay.com/pgw/order.do";
-  const redirectUrl = `${gpUrl}?${digestText.replace(/\|/g, "&")}&DIGEST=${encodeURIComponent(digest)}`;
+    // Redirect URL
+    const gpUrl = "https://test.3dsecure.gpwebpay.com/pgw/order.do";
+    const redirectUrl = `${gpUrl}?${digestText.replace(/\|/g, "&")}&DIGEST=${encodeURIComponent(digest)}`;
 
-  return res.status(200).json({ redirectUrl });
+    return res.status(200).json({ redirectUrl });
+  } catch (error) {
+    console.error("Signing error:", error);
+    return res.status(500).json({ error: "Failed to sign request" });
+  }
 }
