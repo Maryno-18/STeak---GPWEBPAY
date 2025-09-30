@@ -15,7 +15,7 @@ export default function handler(req, res) {
   const DEPOSITFLAG = "1";
 
   const RETURN_URL =
-    "https://steak-gpwebpay-kzk4ziifw4-ballers-maryno.vercel.app/api/payment-result";
+    "https://steak-gpwebpay.vercel.app/api/payment-result";
 
   const AMOUNT = amount * 100;
 
