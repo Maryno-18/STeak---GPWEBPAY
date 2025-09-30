@@ -24,11 +24,9 @@ export default async function handler(req, res) {
     }
   });
 
-  // standardní pole z dokumentace
   const {
     OPERATION,
     ORDERNUMBER,
-    MERCHANTNUMBER,
     MD,
     PRCODE,
     SRCODE,
@@ -43,11 +41,9 @@ export default async function handler(req, res) {
   const gpPublicKey = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
   const merchantNumber = process.env.GP_MERCHANT_NUMBER;
 
-  // sestavení řetězce přesně podle dokumentace GP WebPay
   const fields = [
     OPERATION,
     ORDERNUMBER,
-    MERCHANTNUMBER || merchantNumber,
     MD || "",
     PRCODE || "",
     SRCODE || "",
@@ -68,7 +64,6 @@ export default async function handler(req, res) {
   const digest1Ok = verify(dataToVerify1, DIGEST1);
 
   if (!digestOk || !digest1Ok) {
-    console.error("Invalid signature", { dataToVerify, DIGEST, DIGEST1 });
     return res.status(400).send("Invalid signature");
   }
 
@@ -79,7 +74,6 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         OPERATION,
         ORDERNUMBER,
-        MERCHANTNUMBER,
         PRCODE,
         SRCODE,
         RESULTTEXT,
