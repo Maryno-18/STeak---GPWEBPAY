@@ -7,47 +7,51 @@ export default function handler(req, res) {
 
   const { orderNumber, amount, email } = req.body;
 
-  // Merchant údaje – testovací
+  // Testovací údaje – přes ENV proměnné
   const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER;
+  const OPERATION = "CREATE_ORDER";
   const CURRENCY = "203"; // CZK
   const DEPOSITFLAG = "1";
-  const OPERATION = "CREATE_ORDER";
   const RETURN_URL = "https://www.steak-restaurant.cz/payment-result";
 
-  // Částka v haléřích
+  // GP WebPay očekává částku v haléřích
   const AMOUNT = amount * 100;
 
-  // Privátní klíč z ENV
-  const privateKey = {
-    key: process.env.GP_PRIVATE_KEY,
-    passphrase: process.env.GP_PRIVATE_KEY_PASSPHRASE,
-  };
-
-  // Sestavení dat pro podpis
-  const digestText = [
-    `MERCHANTNUMBER=${MERCHANTNUMBER}`,
-    `OPERATION=${OPERATION}`,
-    `ORDERNUMBER=${orderNumber}`,
-    `AMOUNT=${AMOUNT}`,
-    `CURRENCY=${CURRENCY}`,
-    `DEPOSITFLAG=${DEPOSITFLAG}`,
-    `URL=${RETURN_URL}`,
-    `EMAIL=${email}`
+  // Data pro podpis v přesném pořadí
+  const dataToSign = [
+    MERCHANTNUMBER,
+    OPERATION,
+    orderNumber,
+    AMOUNT,
+    CURRENCY,
+    DEPOSITFLAG,
+    RETURN_URL,
+    email,
   ].join("|");
 
-  try {
-    // Podpis
-    const sign = crypto.createSign("sha1");
-    sign.update(digestText);
-    const digest = sign.sign(privateKey, "base64");
+  // Vytvoření podpisu pomocí privátního klíče
+  const privateKey = process.env.GP_PRIVATE_KEY.replace(/\\n/g, "\n"); // pokud je v ENV s \n
+  const passphrase = process.env.GP_PRIVATE_KEY_PASSPHRASE || undefined;
 
-    // Testovací URL GP WebPay
-    const gpUrl = "https://test.3dsecure.gpwebpay.com/pgw/order.do";
-    const redirectUrl = `${gpUrl}?${digestText.replace(/\|/g, "&")}&DIGEST=${encodeURIComponent(digest)}`;
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(dataToSign);
+  const digest = signer.sign(
+    { key: privateKey, passphrase },
+    "base64"
+  );
 
-    return res.status(200).json({ redirectUrl });
-  } catch (error) {
-    console.error("Signing error:", error);
-    return res.status(500).json({ error: "Failed to sign request" });
-  }
+  // Připravit redirect URL
+  const redirectUrl =
+    "https://test.3dsecure.gpwebpay.com/pgw/order.do?" +
+    `MERCHANTNUMBER=${MERCHANTNUMBER}&` +
+    `OPERATION=${OPERATION}&` +
+    `ORDERNUMBER=${orderNumber}&` +
+    `AMOUNT=${AMOUNT}&` +
+    `CURRENCY=${CURRENCY}&` +
+    `DEPOSITFLAG=${DEPOSITFLAG}&` +
+    `URL=${encodeURIComponent(RETURN_URL)}&` +
+    `EMAIL=${encodeURIComponent(email)}&` +
+    `DIGEST=${encodeURIComponent(digest)}`;
+
+  return res.status(200).json({ redirectUrl });
 }
