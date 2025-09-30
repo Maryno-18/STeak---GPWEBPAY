@@ -5,12 +5,10 @@ export default function handler(req, res) {
     return res.status(405).json({ error: "Only POST allowed" });
   }
 
-  let { orderNumber, amount } = req.body;
+  let { amount } = req.body;
 
-  // pokud nepřijde orderNumber z Make, vygenerujeme unikátní
-  if (!orderNumber) {
-    orderNumber = Date.now().toString().slice(-10); // max. 10 číslic
-  }
+  // vždy generujeme unikátní ORDERNUMBER (max 10 číslic)
+  const orderNumber = Date.now().toString().slice(-10);
 
   const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER;
   const OPERATION = "CREATE_ORDER";
