@@ -52,9 +52,15 @@ export default async function handler(req, res) {
   const dataToVerify1 = `${dataToVerify}|${SRCODE}`;
 
   const verify = (data, signature) => {
-    const verifier = crypto.createVerify("RSA-SHA1");
-    verifier.update(data);
-    return verifier.verify(gpPublicKey, signature, "base64");
+    return crypto.verify(
+      "sha256",
+      Buffer.from(data, "utf8"),
+      {
+        key: gpPublicKey,
+        padding: crypto.constants.RSA_PKCS1_PADDING,
+      },
+      Buffer.from(signature, "base64")
+    );
   };
 
   const digestOk = verify(dataToVerify, DIGEST);
