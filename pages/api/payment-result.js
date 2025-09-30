@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import { X509Certificate } from "crypto";
+import url from "url";
+import querystring from "querystring";
 
 export const config = {
   api: {
@@ -11,9 +12,6 @@ export default async function handler(req, res) {
   if (req.method !== "POST" && req.method !== "GET") {
     return res.status(405).send("Only GET or POST allowed");
   }
-
-  const url = require("url");
-  const querystring = require("querystring");
 
   const params = await new Promise((resolve) => {
     if (req.method === "POST") {
@@ -36,21 +34,27 @@ export default async function handler(req, res) {
     ...rest
   } = params;
 
+  const gpPublicKey = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
   const merchantNumber = process.env.GP_MERCHANT_NUMBER;
-  const certPem = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
 
-  // z certifikátu vytáhneme public key
-  const cert = new X509Certificate(certPem);
-  const publicKey = cert.publicKey;
+  const AMOUNT = rest.AMOUNT || "0";
+  const CURRENCY = rest.CURRENCY || "0";
 
-  const keys = Object.keys(params).filter(k => k !== "DIGEST" && k !== "DIGEST1");
-  const dataToVerify = keys.sort().map(k => params[k]).join("|");
-  const dataToVerify1 = `${dataToVerify}|${merchantNumber}`;
+  const dataToVerify = [
+    OPERATION,
+    ORDERNUMBER,
+    merchantNumber,
+    AMOUNT,
+    CURRENCY,
+    PRCODE
+  ].join("|");
+
+  const dataToVerify1 = `${dataToVerify}|${SRCODE}`;
 
   const verify = (data, signature) => {
     const verifier = crypto.createVerify("RSA-SHA1");
     verifier.update(data);
-    return verifier.verify(publicKey, signature, "base64");
+    return verifier.verify(gpPublicKey, signature, "base64");
   };
 
   const digestOk = verify(dataToVerify, DIGEST);
@@ -64,7 +68,16 @@ export default async function handler(req, res) {
     await fetch(process.env.MAKE_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ORDERNUMBER, OPERATION, PRCODE, SRCODE, RESULTTEXT, ...rest }),
+      body: JSON.stringify({
+        ORDERNUMBER,
+        OPERATION,
+        PRCODE,
+        SRCODE,
+        RESULTTEXT,
+        AMOUNT,
+        CURRENCY,
+        ...rest
+      }),
     });
   }
 
