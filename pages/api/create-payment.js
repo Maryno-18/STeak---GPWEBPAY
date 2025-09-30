@@ -7,19 +7,18 @@ export default function handler(req, res) {
 
   let { amount } = req.body;
 
-  // vždy generujeme unikátní ORDERNUMBER (max 10 číslic)
   const orderNumber = Date.now().toString().slice(-10);
 
   const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER;
   const OPERATION = "CREATE_ORDER";
   const CURRENCY = "203"; // CZK
   const DEPOSITFLAG = "1";
-  const RETURN_URL = "https://www.steak-restaurant.cz/payment-result";
 
-  // částka v haléřích
+  const RETURN_URL =
+    "https://steak-gpwebpay-kzk4ziifw4-ballers-maryno.vercel.app/api/payment-result";
+
   const AMOUNT = amount * 100;
 
-  // povinná pole pro podpis
   const dataToSign = [
     MERCHANTNUMBER,
     OPERATION,
@@ -30,16 +29,13 @@ export default function handler(req, res) {
     RETURN_URL
   ].join("|");
 
-  // privátní klíč a passphrase
   const privateKey = process.env.GP_PRIVATE_KEY.replace(/\\n/g, "\n");
   const passphrase = process.env.GP_PRIVATE_KEY_PASSPHRASE || undefined;
 
-  // podpis přes RSA-SHA1
   const signer = crypto.createSign("RSA-SHA1");
   signer.update(dataToSign);
   const digest = signer.sign({ key: privateKey, passphrase }, "base64");
 
-  // redirect URL
   const redirectUrl =
     "https://test.3dsecure.gpwebpay.com/pgw/order.do?" +
     `MERCHANTNUMBER=${MERCHANTNUMBER}&` +
