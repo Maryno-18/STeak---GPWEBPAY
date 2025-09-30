@@ -24,12 +24,17 @@ export default async function handler(req, res) {
     }
   });
 
+  // standardní pole z dokumentace
   const {
-    ORDERNUMBER,
     OPERATION,
+    ORDERNUMBER,
+    MERCHANTNUMBER,
+    MD,
     PRCODE,
     SRCODE,
     RESULTTEXT,
+    USERPARAM1,
+    ADDINFO,
     DIGEST,
     DIGEST1,
     ...rest
@@ -38,8 +43,19 @@ export default async function handler(req, res) {
   const gpPublicKey = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
   const merchantNumber = process.env.GP_MERCHANT_NUMBER;
 
-  const keys = Object.keys(params).filter(k => k !== "DIGEST" && k !== "DIGEST1");
-  const dataToVerify = keys.sort().map(k => params[k]).join("|");
+  // sestavení řetězce přesně podle dokumentace GP WebPay
+  const fields = [
+    OPERATION,
+    ORDERNUMBER,
+    MERCHANTNUMBER || merchantNumber,
+    MD || "",
+    PRCODE || "",
+    SRCODE || "",
+    RESULTTEXT || "",
+    USERPARAM1 || "",
+    ADDINFO || ""
+  ];
+  const dataToVerify = fields.join("|");
   const dataToVerify1 = `${dataToVerify}|${merchantNumber}`;
 
   const verify = (data, signature) => {
@@ -52,18 +68,27 @@ export default async function handler(req, res) {
   const digest1Ok = verify(dataToVerify1, DIGEST1);
 
   if (!digestOk || !digest1Ok) {
+    console.error("Invalid signature", { dataToVerify, DIGEST, DIGEST1 });
     return res.status(400).send("Invalid signature");
   }
 
-  // Optional: webhook do Make
   if (process.env.MAKE_WEBHOOK_URL) {
     await fetch(process.env.MAKE_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ORDERNUMBER, OPERATION, PRCODE, SRCODE, RESULTTEXT, ...rest }),
+      body: JSON.stringify({
+        OPERATION,
+        ORDERNUMBER,
+        MERCHANTNUMBER,
+        PRCODE,
+        SRCODE,
+        RESULTTEXT,
+        USERPARAM1,
+        ADDINFO,
+        ...rest
+      }),
     });
   }
 
   return res.status(200).send("Payment OK");
 }
-
