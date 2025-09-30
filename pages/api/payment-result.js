@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { X509Certificate } from "crypto";
 
 export const config = {
   api: {
@@ -25,39 +26,31 @@ export default async function handler(req, res) {
   });
 
   const {
-    OPERATION,
     ORDERNUMBER,
-    MD,
+    OPERATION,
     PRCODE,
     SRCODE,
     RESULTTEXT,
-    USERPARAM1,
-    ADDINFO,
     DIGEST,
     DIGEST1,
     ...rest
   } = params;
 
-  const gpPublicKey = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
   const merchantNumber = process.env.GP_MERCHANT_NUMBER;
+  const certPem = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
 
-  const fields = [
-    OPERATION,
-    ORDERNUMBER,
-    MD || "",
-    PRCODE || "",
-    SRCODE || "",
-    RESULTTEXT || "",
-    USERPARAM1 || "",
-    ADDINFO || ""
-  ];
-  const dataToVerify = fields.join("|");
+  // z certifikátu vytáhneme public key
+  const cert = new X509Certificate(certPem);
+  const publicKey = cert.publicKey;
+
+  const keys = Object.keys(params).filter(k => k !== "DIGEST" && k !== "DIGEST1");
+  const dataToVerify = keys.sort().map(k => params[k]).join("|");
   const dataToVerify1 = `${dataToVerify}|${merchantNumber}`;
 
   const verify = (data, signature) => {
     const verifier = crypto.createVerify("RSA-SHA1");
     verifier.update(data);
-    return verifier.verify(gpPublicKey, signature, "base64");
+    return verifier.verify(publicKey, signature, "base64");
   };
 
   const digestOk = verify(dataToVerify, DIGEST);
@@ -71,16 +64,7 @@ export default async function handler(req, res) {
     await fetch(process.env.MAKE_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        OPERATION,
-        ORDERNUMBER,
-        PRCODE,
-        SRCODE,
-        RESULTTEXT,
-        USERPARAM1,
-        ADDINFO,
-        ...rest
-      }),
+      body: JSON.stringify({ ORDERNUMBER, OPERATION, PRCODE, SRCODE, RESULTTEXT, ...rest }),
     });
   }
 
