@@ -7,16 +7,17 @@ export default function handler(req, res) {
 
   const { orderNumber, amount, email } = req.body;
 
+  // Přihlašovací údaje a konstanty
   const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER;
   const OPERATION = "CREATE_ORDER";
   const CURRENCY = "203"; // CZK
   const DEPOSITFLAG = "1";
   const RETURN_URL = "https://www.steak-restaurant.cz/payment-result";
 
-  // částka v haléřích
+  // Částka v haléřích
   const AMOUNT = amount * 100;
 
-  // Data k podpisu – přesné pořadí dle dokumentace
+  // Data pro podpis – jen povinná pole dle specifikace
   const dataToSign = [
     MERCHANTNUMBER,
     OPERATION,
@@ -27,7 +28,7 @@ export default function handler(req, res) {
     RETURN_URL
   ].join("|");
 
-  // podepsání klíčem
+  // Podepsání klíčem
   const privateKey = process.env.GP_PRIVATE_KEY.replace(/\\n/g, "\n");
   const passphrase = process.env.GP_PRIVATE_KEY_PASSPHRASE || undefined;
 
@@ -35,7 +36,7 @@ export default function handler(req, res) {
   signer.update(dataToSign);
   const digest = signer.sign({ key: privateKey, passphrase }, "base64");
 
-  // redirect URL (jen povinná pole + email nepovinně)
+  // Redirect URL
   let redirectUrl =
     "https://test.3dsecure.gpwebpay.com/pgw/order.do?" +
     `MERCHANTNUMBER=${MERCHANTNUMBER}&` +
@@ -47,6 +48,7 @@ export default function handler(req, res) {
     `URL=${encodeURIComponent(RETURN_URL)}&` +
     `DIGEST=${encodeURIComponent(digest)}`;
 
+  // Email je nepovinný – přidáme jen do redirectu
   if (email) {
     redirectUrl += `&EMAIL=${encodeURIComponent(email)}`;
   }
