@@ -31,14 +31,12 @@ export default async function handler(req, res) {
     RESULTTEXT,
     DIGEST,
     DIGEST1,
-    ...rest
+    AMOUNT = "0",
+    CURRENCY = "0",
   } = params;
 
-  const gpPublicKey = process.env.GP_PUBLIC_KEY;
+  const gpPublicKeyRaw = process.env.GP_PUBLIC_KEY?.replace(/\\n/g, "\n");
   const merchantNumber = process.env.GP_MERCHANT_NUMBER;
-
-  const AMOUNT = rest.AMOUNT || "0";
-  const CURRENCY = rest.CURRENCY || "0";
 
   const dataToVerify = [
     OPERATION,
@@ -54,7 +52,7 @@ export default async function handler(req, res) {
   const verify = (data, signature) => {
     const verifier = crypto.createVerify("RSA-SHA1");
     verifier.update(data, "utf8");
-    return verifier.verify(gpPublicKey, signature, "base64");
+    return verifier.verify(gpPublicKeyRaw, signature, "base64");
   };
 
   const digestOk = verify(dataToVerify, DIGEST);
@@ -64,6 +62,7 @@ export default async function handler(req, res) {
     return res.status(400).send("Invalid signature");
   }
 
+  // ✅ Zde si můžeš spustit vlastní webhook
   if (process.env.MAKE_WEBHOOK_URL) {
     await fetch(process.env.MAKE_WEBHOOK_URL, {
       method: "POST",
@@ -76,10 +75,10 @@ export default async function handler(req, res) {
         RESULTTEXT,
         AMOUNT,
         CURRENCY,
-        ...rest
       }),
     });
   }
 
-  return res.status(200).send("Payment OK");
+  // ✅ Zde můžeš přesměrovat uživatele po platbě:
+  return res.redirect(302, `/thank-you?paid=true`);
 }
