@@ -6,7 +6,6 @@ export default function handler(req, res) {
   }
 
   let { amount } = req.body;
-
   const orderNumber = Date.now().toString().slice(-10);
 
   const MERCHANTNUMBER = process.env.GP_MERCHANT_NUMBER;
@@ -14,8 +13,8 @@ export default function handler(req, res) {
   const CURRENCY = "203"; // CZK
   const DEPOSITFLAG = "1";
 
-  const RETURN_URL =
-    "https://steak-gpwebpay.vercel.app/api/payment-result";
+  const RETURN_URL = "https://steak-gpwebpay.vercel.app/api/payment-result";
+  const RETURN_URL_CUSTOMER = "https://www.steak-restaurant.cz/payment-return"; // zákazník bude přesměrován sem
 
   const AMOUNT = amount * 100;
 
@@ -45,6 +44,7 @@ export default function handler(req, res) {
     `CURRENCY=${CURRENCY}&` +
     `DEPOSITFLAG=${DEPOSITFLAG}&` +
     `URL=${encodeURIComponent(RETURN_URL)}&` +
+    `URL_RETURN=${encodeURIComponent(RETURN_URL_CUSTOMER)}&` +
     `DIGEST=${encodeURIComponent(digest)}`;
 
   return res.status(200).json({ redirectUrl });
