@@ -34,7 +34,7 @@ export default async function handler(req, res) {
     ...rest
   } = params;
 
-  const gpPublicKey = process.env.GP_PUBLIC_KEY.replace(/\\n/g, "\n");
+  const gpPublicKey = process.env.GP_PUBLIC_KEY;
   const merchantNumber = process.env.GP_MERCHANT_NUMBER;
 
   const AMOUNT = rest.AMOUNT || "0";
